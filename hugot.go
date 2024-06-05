@@ -17,6 +17,7 @@ type Session struct {
 	featureExtractionPipelines   pipelineMap[*pipelines.FeatureExtractionPipeline]
 	tokenClassificationPipelines pipelineMap[*pipelines.TokenClassificationPipeline]
 	textClassificationPipelines  pipelineMap[*pipelines.TextClassificationPipeline]
+	textSummarizationPipelines   pipelineMap[*pipelines.TextSummarizationPipeline]
 	ortOptions                   *ort.SessionOptions
 }
 
@@ -55,6 +56,12 @@ type TextClassificationOption = pipelines.PipelineOption[*pipelines.TextClassifi
 
 // FeatureExtractionOption is an option for a feature extraction pipeline
 type FeatureExtractionOption = pipelines.PipelineOption[*pipelines.FeatureExtractionPipeline]
+
+// TextSummarisationConfig is the configuration for a text summarization pipeline
+type TextSummarizationConfig = pipelines.PipelineConfig[*pipelines.TextSummarizationPipeline]
+
+// TextSummarizationOption is an option for a text summarization pipeline
+type TextSummarizationOption = pipelines.PipelineOption[*pipelines.TextSummarizationPipeline]
 
 // NewSession is the main entrypoint to hugot and is used to create a new hugot session object.
 // ortLibraryPath should be the path to onnxruntime.so. If it's the empty string, hugot will try
@@ -248,6 +255,14 @@ func NewPipeline[T pipelines.Pipeline](s *Session, pipelineConfig pipelines.Pipe
 		}
 		s.featureExtractionPipelines[config.Name] = pipelineInitialised
 		pipeline = any(pipelineInitialised).(T)
+	case *pipelines.TextSummarizationPipeline:
+		config := any(pipelineConfig).(pipelines.PipelineConfig[*pipelines.TextSummarizationPipeline])
+		pipelineInitialised, err := pipelines.NewTextSummarizationPipeline(config, s.ortOptions)
+		if err != nil {
+			return pipeline, err
+		}
+		s.textSummarizationPipelines[config.Name] = pipelineInitialised
+		pipeline = any(pipelineInitialised).(T)
 	default:
 		return pipeline, fmt.Errorf("not implemented")
 	}
@@ -272,6 +287,12 @@ func GetPipeline[T pipelines.Pipeline](s *Session, name string) (T, error) {
 		return any(p).(T), nil
 	case *pipelines.FeatureExtractionPipeline:
 		p, ok := s.featureExtractionPipelines[name]
+		if !ok {
+			return pipeline, &pipelineNotFoundError{pipelineName: name}
+		}
+		return any(p).(T), nil
+	case *pipelines.TextSummarizationPipeline:
+		p, ok := s.textSummarizationPipelines[name]
 		if !ok {
 			return pipeline, &pipelineNotFoundError{pipelineName: name}
 		}
